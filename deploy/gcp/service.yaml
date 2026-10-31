@@ -1,0 +1,55 @@
+# ==============================================================================
+# Google Cloud Run Knative Service Manifest (Scale-to-Zero GPU/CPU Serving)
+# Supports optional `nvidia-l4` GPU attachment for batch Two-Tower re-indexing
+# ==============================================================================
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: nexusrec-ai-discovery
+  labels:
+    app: nexusrec-ai
+    tier: multimodal-recsys
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "12"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+        # Uncomment the line below when deploying the GPU-accelerated variant:
+        # run.googleapis.com/accelerator: "nvidia-l4"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - name: nexusrec-api
+          image: us-central1-docker.pkg.dev/PROJECT_ID/nexusrec-repo/nexusrec-ai:latest
+          ports:
+            - name: http1
+              containerPort: 8000
+          env:
+            - name: NEXUSREC_ENV
+              value: "production"
+            - name: EMBEDDING_DIM
+              value: "64"
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+              # nvidia.com/gpu: "1"
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            periodSeconds: 15

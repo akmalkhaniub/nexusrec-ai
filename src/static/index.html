@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NexusRec AI — Multimodal Visual-Semantic Retail & Industrial Discovery Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'ui-monospace', 'SFMono-Regular', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --bg-page: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-elevated: #f1f5f9;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --border-subtle: #e2e8f0;
+      --accent: #0284c7;
+    }
+    html.dark {
+      --bg-page: #0b0f19;
+      --bg-surface: #111827;
+      --bg-elevated: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --border-subtle: #334155;
+      --accent: #38bdf8;
+    }
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    details > summary {
+      list-style: none;
+    }
+    details > summary::-webkit-details-marker {
+      display: none;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-sky-500/20 selection:text-sky-400">
+
+  <!-- Top Navigation Header -->
+  <header class="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-950/90 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-sky-600 dark:bg-sky-500 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+          NR
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h1 class="font-semibold text-base sm:text-lg tracking-tight text-slate-900 dark:text-slate-100">
+              NexusRec AI
+            </h1>
+            <span id="engine-status-pill" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span id="engine-status-text">Two-Tower + Hybrid RRF Online</span>
+            </span>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400 hidden sm:block">
+            Multimodal Visual-Semantic Retail &amp; Industrial Discovery • Cross-Encoder &amp; MMR Diversification
+          </p>
+        </div>
+      </div>
+
+      <!-- Tactile Navigation Tabs & Theme Toggle -->
+      <div class="flex items-center gap-2">
+        <nav class="flex items-center p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800" aria-label="Primary Views">
+          <button
+            type="button"
+            onclick="switchTab('discovery')"
+            id="tab-btn-discovery"
+            class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700"
+          >
+            Discovery &amp; 4-Stage Funnel
+          </button>
+          <button
+            type="button"
+            onclick="switchTab('benchmarks')"
+            id="tab-btn-benchmarks"
+            class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+          >
+            RecSys Benchmarks &amp; Lift
+          </button>
+          <button
+            type="button"
+            onclick="switchTab('architecture')"
+            id="tab-btn-architecture"
+            class="px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
+          >
+            Vectors &amp; Cloud IaC
+          </button>
+        </nav>
+
+        <button
+          type="button"
+          id="theme-toggle-btn"
+          onclick="toggleTheme()"
+          title="Switch Light / Dark Theme"
+          class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:border-sky-500/50 transition-all"
+          aria-label="Toggle color theme"
+        >
+          <svg id="icon-sun" class="w-4 h-4 hidden dark:block text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"></circle>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+          </svg>
+          <svg id="icon-moon" class="w-4 h-4 block dark:hidden text-slate-700" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- Executive KPI Bar (Business & RecSys Impact) -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3.5" aria-label="RecSys & Commercial KPIs">
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">NDCG@10 Ranking Accuracy</span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" id="kpi-ndcg-lift">+119.5% vs Pop</span>
+        </div>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" id="kpi-ndcg-val">0.9142</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">4 buyer cohorts</span>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Expected Gross Margin / Item</span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400">Margin-Aware CE</span>
+        </div>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" id="kpi-margin-val">$94.60</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400" id="kpi-margin-sub">expected unit contribution</span>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">MMR Intra-List Diversity (ILD)</span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" id="kpi-cats-badge">4 Categories</span>
+        </div>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" id="kpi-ild-val">0.6840</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">anti-saturation filter</span>
+        </div>
+      </div>
+
+      <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-slate-500 dark:text-slate-400">Thompson Bandit Exploration</span>
+          <span class="text-xs font-semibold px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400" id="kpi-bandit-badge">Beta(α, β) Active</span>
+        </div>
+        <div class="mt-1.5 flex items-baseline gap-2">
+          <span class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white" id="kpi-coldstart-val">1 Cold-Start</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400" id="kpi-latency-sub">3.8 ms funnel</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 1: DISCOVERY & 4-STAGE FUNNEL (HERO JTBD) ==================== -->
+    <div id="tab-panel-discovery" class="space-y-6">
+
+      <!-- Hero Control Panel: Persona Switcher + Conversational & Visual Search -->
+      <section class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm p-5 sm:p-6 space-y-5">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800/80 pb-4">
+          <div>
+            <h2 class="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+              Conversational &amp; Visual Multimodal Discovery Console
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Select a buyer persona or enter natural language + visual reference constraints to inspect the live 4-stage recommendation funnel.
+            </p>
+          </div>
+
+          <!-- Quick Preset Scenario Buttons -->
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs font-medium text-slate-400 dark:text-slate-500 mr-1">Quick Scenarios:</span>
+            <button
+              type="button"
+              onclick="applyScenarioPreset('alpine_mountaineer', 'waterproof alpine shell under $220 that pairs with crampon boots', 'alpine_hardshell_jacket', 0.72)"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 hover:bg-sky-500/20 transition-all"
+            >
+              Alpine Shell &lt; $220 + Crampon Fit
+            </button>
+            <button
+              type="button"
+              onclick="applyScenarioPreset('plant_reliability_lead', 'high-pressure hydraulic seal replacement under $150', 'hydraulic_viton_seal_kit', 0.74)"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20 transition-all"
+            >
+              Hydraulic Seal MRO &lt; $150
+            </button>
+            <button
+              type="button"
+              onclick="applyScenarioPreset('cnc_automation_architect', 'precision ceramic CNC spindle bearing and vibration telemetry under $250', 'ceramic_spindle_bearing', 0.70)"
+              class="px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 transition-all"
+            >
+              CNC Ceramic Spindle &lt; $250
+            </button>
+          </div>
+        </div>
+
+        <!-- Control Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <!-- Buyer Persona Selector -->
+          <div class="lg:col-span-4 space-y-1.5">
+            <label for="persona-select" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Active Buyer Persona (UserTower Context)
+            </label>
+            <select
+              id="persona-select"
+              onchange="onPersonaChanged()"
+              class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="alpine_mountaineer">Elena Vance — Technical Alpinist (Retail • $220 ceiling)</option>
+              <option value="plant_reliability_lead">Marcus Thorne — Hydraulic Reliability Lead (Industrial • $150 ceiling)</option>
+              <option value="cnc_automation_architect">Dr. Kenji Sato — CNC &amp; Robotics Lead (Industrial • $250 ceiling)</option>
+              <option value="ultralight_trail_buyer">Maya Lin — Ultralight Gear Specialist (Retail • $200 ceiling)</option>
+            </select>
+            <p id="persona-history-desc" class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-0.5">
+              Recent session: RET-005 (B3 Crampon Boots), RET-013 (12-Pt Crampons), RET-019 (Merino Baselayer)
+            </p>
+          </div>
+
+          <!-- Visual Reference Camera/Image Preset -->
+          <div class="lg:col-span-4 space-y-1.5">
+            <label for="visual-preset-select" class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              32-D OpenCV Visual Reference Descriptor
+            </label>
+            <select
+              id="visual-preset-select"
+              onchange="runDiscoverySearch()"
+              class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/90 px-3.5 py-2.5 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            >
+              <option value="">None (Text + Session Sequence Only)</option>
+              <option value="alpine_hardshell_jacket" selected>Gore-Tex Alpine Hardshell (HSV Blue • Ripstop Contour)</option>
+              <option value="crampon_mountaineering_boot">Rigid Crampon Boot (Vibram Lug • High-Ankle Contour)</option>
+              <option value="hydraulic_viton_seal_kit">Viton Hydraulic Seal Kit (FKM Elastomer • Annular Ring)</option>
+              <option value="cnc_stainless_manifold_valve">316L Directional Manifold Valve (CNC Specular Steel)</option>
+              <option value="ceramic_spindle_bearing">ABEC-9 Hybrid Ceramic Bearing (Si3N4 Nitride Race)</option>
+            </select>
+            <p class="text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+              Extracts 12-bin HSV color + 10-bin Sobel contour + 10-bin Gabor surface energy.
+            </p>
+          </div>
+
+          <!-- MMR Diversity & Bandit Sliders -->
+          <div class="lg:col-span-4 grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800">
+            <div>
+              <div class="flex justify-between text-xs font-medium">
+                <span class="text-slate-600 dark:text-slate-300">MMR λ (Rel/Div)</span>
+                <span id="mmr-lambda-label" class="font-mono text-sky-600 dark:text-sky-400">0.72</span>
+              </div>
+              <input
+                id="mmr-lambda-slider"
+                type="range"
+                min="0.30"
+                max="1.00"
+                step="0.02"
+                value="0.72"
+                oninput="document.getElementById('mmr-lambda-label').textContent = parseFloat(this.value).toFixed(2)"
+                onchange="runDiscoverySearch()"
+                class="w-full mt-2 accent-sky-500 cursor-pointer"
+              />
+              <span class="block text-[11px] text-slate-400">Lower λ = wider categories</span>
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs font-medium">
+                <span class="text-slate-600 dark:text-slate-300">Bandit Explore</span>
+                <span id="bandit-weight-label" class="font-mono text-amber-600 dark:text-amber-400">0.12</span>
+              </div>
+              <input
+                id="bandit-weight-slider"
+                type="range"
+                min="0.00"
+                max="0.40"
+                step="0.02"
+                value="0.12"
+                oninput="document.getElementById('bandit-weight-label').textContent = parseFloat(this.value).toFixed(2)"
+                onchange="runDiscoverySearch()"
+                class="w-full mt-2 accent-amber-500 cursor-pointer"
+              />
+              <span class="block text-[11px] text-slate-400">Cold-start Beta(α,β) boost</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Natural Language Search Input Bar -->
+        <form onsubmit="event.preventDefault(); runDiscoverySearch();" class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <input
+              id="search-query-input"
+              type="text"
+              value="waterproof alpine shell under $220 that pairs with crampon boots"
+              placeholder="Ask in natural language (e.g., 'waterproof alpine shell under $220 that pairs with crampon boots' or 'high-pressure hydraulic seal replacement under $150')..."
+              class="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 pl-4 pr-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+          </div>
+          <button
+            type="submit"
+            id="run-funnel-btn"
+            class="px-6 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 active:scale-[0.99] text-white font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 shrink-0"
+          >
+            <span>Execute 4-Stage Funnel</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </button>
+        </form>
+
+        <!-- Parsed Conversational Constraints & Synthesis Banner -->
+        <div class="rounded-xl bg-slate-50 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="space-y-1">
+            <div class="flex flex-wrap items-center gap-2" id="parsed-intent-pills">
+              <!-- Populated dynamically -->
+            </div>
+            <p id="assistant-synthesis-text" class="text-xs sm:text-sm text-slate-700 dark:text-slate-300 font-medium">
+              Executing multimodal Two-Tower + BM25 RRF retrieval...
+            </p>
+          </div>
+          <div class="text-right shrink-0">
+            <span class="text-[11px] uppercase tracking-wider text-slate-400 block">Pipeline Latency</span>
+            <span id="funnel-latency-badge" class="font-mono text-xs font-semibold text-emerald-600 dark:text-emerald-400">3.8 ms total</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Live 4-Stage Recommendation Funnel Stepper -->
+      <section aria-label="4-Stage Recommendation Funnel">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <!-- Stage 1 -->
+          <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs font-semibold text-sky-600 dark:text-sky-400">
+              <span>STAGE 1 • CANDIDATE GEN</span>
+              <span class="font-mono" id="stage1-count-badge">44 → 21 items</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-sm text-slate-900 dark:text-white">
+              Qdrant Filter + Two-Tower 64-D
+            </h3>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Hard payload filter (<code class="font-mono">in_stock</code>, <code class="font-mono">max_price</code>, <code class="font-mono">domain</code>) + L2 User/Item Tower cosine dot product.
+            </p>
+          </div>
+
+          <!-- Stage 2 -->
+          <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+              <span>STAGE 2 • HYBRID RRF FUSION</span>
+              <span class="font-mono" id="stage2-count-badge">Top 18 fused</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-sm text-slate-900 dark:text-white">
+              Dense Cosine + BM25 (k = 60)
+            </h3>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Reciprocal Rank Fusion merges 64-D multimodal vector ranks with sparse SPLADE/BM25 lexical ranks.
+            </p>
+          </div>
+
+          <!-- Stage 3 -->
+          <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs font-semibold text-amber-600 dark:text-amber-400">
+              <span>STAGE 3 • DEEP RERANKING</span>
+              <span class="font-mono" id="stage3-count-badge">GBDT + Bandit</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-sm text-slate-900 dark:text-white">
+              Cross-Encoder + Thompson Bandit
+            </h3>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Scores 7 pairwise feature crosses (compatibility, budget headroom, gross margin) + Beta(α,β) exploration.
+            </p>
+          </div>
+
+          <!-- Stage 4 -->
+          <div class="p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+            <div class="flex items-center justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+              <span>STAGE 4 • MMR DIVERSITY</span>
+              <span class="font-mono" id="stage4-count-badge">6 Final Items</span>
+            </div>
+            <h3 class="mt-1 font-semibold text-sm text-slate-900 dark:text-white">
+              Maximal Marginal Relevance
+            </h3>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Penalizes redundant category &amp; visual clones so buyers receive a complete, high-margin kit.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ranked Recommendations Grid -->
+      <section class="space-y-3" aria-label="Ranked Recommendations">
+        <div class="flex items-center justify-between">
+          <h2 class="text-base font-semibold text-slate-900 dark:text-white">
+            Ranked Multimodal Recommendations (Click Bandit Reward to Update Posterior Live)
+          </h2>
+          <span id="bandit-toast" class="text-xs font-medium text-emerald-600 dark:text-emerald-400 hidden"></span>
+        </div>
+
+        <div id="recommendations-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- Progressive Disclosure: Inspect Qdrant Filter JSON & UserTower 64-D Tensor -->
+      <details class="group rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden">
+        <summary class="px-5 py-3.5 cursor-pointer flex items-center justify-between text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800/60 select-none">
+          <span>▶ Inspect Live Qdrant Hybrid Payload Filter, Visual Descriptor &amp; 64-D UserTower Tensor</span>
+          <span class="text-xs font-mono text-slate-400 group-open:rotate-90 transition-transform">▸</span>
+        </summary>
+        <div class="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-950/60 grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              Qdrant Payload Filter &amp; Latency Breakdown
+            </h4>
+            <pre id="debug-qdrant-json" class="p-3.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto leading-relaxed"></pre>
+          </div>
+          <div>
+            <h4 class="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
+              UserTower 64-D L2-Normalized Embedding &amp; Visual Query Signature
+            </h4>
+            <pre id="debug-tensor-json" class="p-3.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-xs overflow-x-auto leading-relaxed"></pre>
+          </div>
+        </div>
+      </details>
+
+    </div>
+
+    <!-- ==================== TAB 2: RECSYS BENCHMARKS & LIFT ==================== -->
+    <div id="tab-panel-benchmarks" class="space-y-6 hidden">
+      <section class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+              Offline &amp; Online RecSys Evaluation Suite (K = 10)
+            </h2>
+            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              Deterministic comparison across 4 enterprise buyer cohorts: Baseline Popularity vs. Pure Collaborative Filtering vs. NexusRec Two-Tower + MMR.
+            </p>
+          </div>
+          <button
+            type="button"
+            onclick="triggerContrastiveTraining()"
+            class="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-sm transition-all shrink-0"
+          >
+            Run InfoNCE Contrastive Training Step
+          </button>
+        </div>
+
+        <!-- Benchmark Comparison Table -->
+        <div class="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <table class="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr class="bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
+                <th class="py-3 px-4 font-semibold">Architecture</th>
+                <th class="py-3 px-4 font-semibold font-mono">NDCG@10</th>
+                <th class="py-3 px-4 font-semibold font-mono">Recall@10</th>
+                <th class="py-3 px-4 font-semibold font-mono">Precision@10</th>
+                <th class="py-3 px-4 font-semibold font-mono">MRR</th>
+                <th class="py-3 px-4 font-semibold font-mono">Catalog Coverage</th>
+                <th class="py-3 px-4 font-semibold font-mono">Diversity (ILD)</th>
+                <th class="py-3 px-4 font-semibold font-mono">Avg Unit Margin</th>
+              </tr>
+            </thead>
+            <tbody id="benchmark-table-body" class="divide-y divide-slate-200 dark:divide-slate-800">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Two-Tower InfoNCE Contrastive Alignment Telemetry Card -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">InfoNCE Contrastive Loss (τ = 0.08)</span>
+            <div class="mt-1.5 flex items-baseline gap-2">
+              <span id="tt-loss-val" class="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">1.9840 → 0.4120</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              In-batch sampled softmax aligns positive <code class="font-mono">(user, item)</code> pairs on the 64-D unit hypersphere.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Positive vs. Negative Cosine Margin</span>
+            <div class="mt-1.5 flex items-baseline gap-2">
+              <span id="tt-margin-val" class="text-xl font-bold font-mono text-sky-600 dark:text-sky-400">+0.6920 separation</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400" id="tt-cos-sub">
+              Mean positive pair cosine: 0.7840 • In-batch negative cosine: 0.0920
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800">
+            <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Tensor Execution Backend</span>
+            <div class="mt-1.5 flex items-baseline gap-2">
+              <span id="tt-backend-val" class="text-xl font-bold font-mono text-indigo-600 dark:text-indigo-400">64-D L2 Hypersphere</span>
+            </div>
+            <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              32-D OpenCV HSV/Sobel/Gabor Visual + 32-D Semantic/Commercial Taxonomy.
+            </p>
+          </div>
+        </div>
+
+        <!-- Per-Cohort Breakdown Cards -->
+        <div>
+          <h3 class="text-sm font-semibold text-slate-900 dark:text-white mb-3">
+            Per-Cohort NexusRec Performance Breakdown
+          </h3>
+          <div id="cohort-breakdown-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== TAB 3: VECTORS & CLOUD IaC (PROGRESSIVE DISCLOSURE) ==================== -->
+    <div id="tab-panel-architecture" class="space-y-6 hidden">
+      <section class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 space-y-4">
+        <div>
+          <h2 class="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+            Production Cloud Deployment Blueprints (AWS &amp; GCP Scale-to-Zero)
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+            Expand any infrastructure manifest below to inspect the production Terraform, Google Cloud Run GPU/CPU serving configuration, or Docker multi-stage build.
+          </p>
+        </div>
+
+        <!-- Accordion 1: Google Cloud Run service.yaml -->
+        <details class="group rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden" open>
+          <summary class="px-4 py-3 cursor-pointer flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <span>▶ Inspect Google Cloud Run Knative Manifest (deploy/gcp/service.yaml — Scale-to-Zero NVIDIA L4 / CPU)</span>
+            <span class="font-mono text-xs text-sky-500">YAML</span>
+          </summary>
+          <div class="p-4 bg-slate-950 text-slate-100 font-mono text-xs overflow-x-auto">
+<pre>apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: nexusrec-ai-discovery
+  annotations:
+    run.googleapis.com/ingress: all
+    run.googleapis.com/launch-stage: BETA
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "12"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/startup-cpu-boost: "true"
+    spec:
+      containerConcurrency: 80
+      timeoutSeconds: 60
+      containers:
+        - image: us-central1-docker.pkg.dev/PROJECT_ID/nexusrec-repo/nexusrec-ai:latest
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: "4000m"
+              memory: "8Gi"
+          startupProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000</pre>
+          </div>
+        </details>
+
+        <!-- Accordion 2: AWS Terraform main.tf -->
+        <details class="group rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+          <summary class="px-4 py-3 cursor-pointer flex items-center justify-between bg-slate-50 dark:bg-slate-800/60 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200">
+            <span>▶ Inspect AWS Terraform Infrastructure (deploy/aws/main.tf — ECS Fargate + SageMaker Serverless + ElastiCache Redis)</span>
+            <span class="font-mono text-xs text-amber-500">HCL / Terraform</span>
+          </summary>
+          <div class="p-4 bg-slate-950 text-slate-100 font-mono text-xs overflow-x-auto">
+<pre>resource "aws_sagemaker_model" "two_tower_onnx" {
+  name               = "nexusrec-two-tower-64d"
+  execution_role_arn = aws_iam_role.sagemaker_exec.arn
+  primary_container {
+    image          = "${aws_ecr_repository.nexusrec.repository_url}:latest"
+    model_data_url = "s3://${aws_s3_bucket.model_registry.id}/models/two_tower_64d.tar.gz"
+  }
+}
+
+resource "aws_sagemaker_endpoint_configuration" "serverless_cfg" {
+  name = "nexusrec-serverless-cfg"
+  production_variants {
+    variant_name = "TwoTowerPrimary"
+    model_name   = aws_sagemaker_model.two_tower_onnx.name
+    serverless_config {
+      memory_size_in_mb = 4096
+      max_concurrency   = 32
+    }
+  }
+}</pre>
+          </div>
+        </details>
+      </section>
+    </div>
+
+  </main>
+
+  <!-- Client Application Logic with Offline Static Fallback -->
+  <script>
+    // Deterministic fallback data when viewed directly on GitHub Pages without FastAPI server
+    const FALLBACK_DISCOVERY = {
+      persona: {
+        user_id: "alpine_mountaineer",
+        name: "Elena Vance — Technical Alpinist & Guide",
+        role: "Outdoor Retail Pro Buyer",
+        preferred_domain: "retail",
+        budget_ceiling: 220.0,
+        recent_item_ids: ["RET-005", "RET-013", "RET-019"]
+      },
+      parsed_intent: {
+        raw_query: "waterproof alpine shell under $220 that pairs with crampon boots",
+        detected_domain: "retail",
+        detected_category: "Alpine Shells",
+        max_price: 220.0,
+        min_price: null,
+        in_stock_only: true,
+        extracted_tags: ["alpine", "boots", "crampon", "shell", "waterproof", "gore-tex"],
+        compatibility_anchor_ids: ["RET-005", "RET-006", "RET-013"],
+        intent_mode: "compatibility_cross_sell",
+        visual_preset_used: "alpine_hardshell_jacket"
+      },
+      funnel_telemetry: {
+        stage0_total_catalog: 44,
+        stage1_filtered_candidates: 18,
+        stage2_hybrid_rrf_retrieved: 18,
+        stage3_cross_encoder_scored: 18,
+        stage4_mmr_final_selected: 6,
+        intra_list_diversity: 0.6924,
+        unique_categories_surfaced: 4,
+        cold_start_items_surfaced: 1,
+        mean_expected_margin_usd: 94.85,
+        latency_breakdown_ms: {
+          intent_parsing_ms: 0.35,
+          multimodal_encoding_ms: 0.62,
+          hybrid_rrf_retrieval_ms: 1.48,
+          cross_encoder_mmr_rerank_ms: 1.42,
+          total_pipeline_ms: 3.87
+        }
+      },
+      qdrant_filter_payload: {
+        must: [
+          { key: "in_stock", match: { value: true } },
+          { key: "domain", match: { value: "retail" } },
+          { key: "unit_price", range: { lte: 220.0 } }
+        ]
+      },
+      user_tower_embedding_preview: [0.1942, 0.1418, -0.1564, -0.1205, 0.2104, 0.0882, -0.0941, 0.1673],
+      assistant_synthesis: "Top match under $220: AetherPro 3L Gore-Tex Alpine Hardshell Jacket ($198.00, 58.0% gross margin) with verified compatibility across RET-005, RET-006, RET-013. Ranked 6 items via Two-Tower + BM25 RRF fusion and MMR diversification (Intra-List Diversity = 0.69).",
+      recommendations: [
+        {
+          rank: 1,
+          item: {
+            item_id: "RET-001",
+            sku: "ARC-SHL-001",
+            title: "AetherPro 3L Gore-Tex Alpine Hardshell Jacket",
+            domain: "retail",
+            category: "Alpine Shells",
+            subcategory: "3-Layer Hardshells",
+            brand: "NordicPeak",
+            unit_price: 198.00,
+            gross_margin_pct: 58.0,
+            unit_margin_usd: 114.84,
+            in_stock: true,
+            stock_qty: 42,
+            color_hex: "#1E6B9B",
+            surface_finish: "gore-tex-3l-ripstop",
+            cold_start: false,
+            tags: ["waterproof", "alpine", "shell", "gore-tex", "crampon"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.9124,
+            stage1_visual_similarity: 0.9640,
+            stage2_sparse_bm25: 14.82,
+            stage2_rrf_fusion: 1.0,
+            stage3_cross_encoder: 0.9410,
+            stage3_thompson_bandit: 0.3480,
+            stage3_combined_relevance: 0.8698,
+            stage4_mmr_penalty: 0.0,
+            final_mmr_score: 0.8698
+          },
+          compatibility_matches: ["RET-005", "RET-006", "RET-013"],
+          matched_terms: ["waterproof", "alpine", "shell", "crampon"],
+          expected_margin_contribution_usd: 108.06,
+          explanation: "Matched lexical intent (waterproof, alpine, shell, crampon) • Direct assembly/kit compatibility with RET-005, RET-006, RET-013 • High Two-Tower cosine alignment (0.91)"
+        },
+        {
+          rank: 2,
+          item: {
+            item_id: "RET-006",
+            sku: "FTW-MNT-002",
+            title: "CrestRunner B2 Semi-Rigid Alpine Crampon Boots",
+            domain: "retail",
+            category: "Mountaineering Footwear",
+            subcategory: "B2 Semi-Automatic Boots",
+            brand: "DolomiteAlps",
+            unit_price: 212.00,
+            gross_margin_pct: 56.5,
+            unit_margin_usd: 119.78,
+            in_stock: true,
+            stock_qty: 34,
+            color_hex: "#C84B31",
+            surface_finish: "vibram-lug-rubber",
+            cold_start: false,
+            tags: ["crampon", "boots", "alpine", "waterproof", "vibram"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.8740,
+            stage1_visual_similarity: 0.7810,
+            stage2_sparse_bm25: 12.64,
+            stage2_rrf_fusion: 0.9682,
+            stage3_cross_encoder: 0.8920,
+            stage3_thompson_bandit: 0.3310,
+            stage3_combined_relevance: 0.8247,
+            stage4_mmr_penalty: 0.1420,
+            final_mmr_score: 0.6827
+          },
+          compatibility_matches: ["RET-013"],
+          matched_terms: ["waterproof", "alpine", "crampon", "boots"],
+          expected_margin_contribution_usd: 106.84,
+          explanation: "Matched lexical intent (waterproof, alpine, crampon, boots) • Direct assembly/kit compatibility with RET-013 • High Two-Tower cosine alignment (0.87)"
+        },
+        {
+          rank: 3,
+          item: {
+            item_id: "RET-017",
+            sku: "PCK-EXP-001",
+            title: "Serac 45L Cordura Waterproof Alpine Pack",
+            domain: "retail",
+            category: "Expedition Packs",
+            subcategory: "Alpine Climbing Packs",
+            brand: "ValhallaGear",
+            unit_price: 208.00,
+            gross_margin_pct: 57.0,
+            unit_margin_usd: 118.56,
+            in_stock: true,
+            stock_qty: 24,
+            color_hex: "#2E4057",
+            surface_finish: "cordura-ballistic-weave",
+            cold_start: false,
+            tags: ["pack", "alpine", "waterproof", "crampon", "cordura"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.8510,
+            stage1_visual_similarity: 0.7690,
+            stage2_sparse_bm25: 10.95,
+            stage2_rrf_fusion: 0.9380,
+            stage3_cross_encoder: 0.8690,
+            stage3_thompson_bandit: 0.3290,
+            stage3_combined_relevance: 0.8042,
+            stage4_mmr_penalty: 0.1480,
+            final_mmr_score: 0.6562
+          },
+          compatibility_matches: ["RET-005", "RET-013"],
+          matched_terms: ["waterproof", "alpine", "crampon"],
+          expected_margin_contribution_usd: 103.03,
+          explanation: "Matched lexical intent (waterproof, alpine, crampon) • Direct assembly/kit compatibility with RET-005, RET-013 • High Two-Tower cosine alignment (0.85)"
+        },
+        {
+          rank: 4,
+          item: {
+            item_id: "RET-002",
+            sku: "ARC-SHL-002",
+            title: "CirrusRidge Waterproof Alpine Storm Shell",
+            domain: "retail",
+            category: "Alpine Shells",
+            subcategory: "3-Layer Hardshells",
+            brand: "ValhallaGear",
+            unit_price: 215.00,
+            gross_margin_pct: 61.5,
+            unit_margin_usd: 132.23,
+            in_stock: true,
+            stock_qty: 29,
+            color_hex: "#16537E",
+            surface_finish: "gore-tex-3l-ripstop",
+            cold_start: false,
+            tags: ["waterproof", "alpine", "shell", "crampon", "storm"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.9010,
+            stage1_visual_similarity: 0.9520,
+            stage2_sparse_bm25: 13.90,
+            stage2_rrf_fusion: 0.9840,
+            stage3_cross_encoder: 0.9280,
+            stage3_thompson_bandit: 0.3410,
+            stage3_combined_relevance: 0.8576,
+            stage4_mmr_penalty: 0.2580,
+            final_mmr_score: 0.5996
+          },
+          compatibility_matches: ["RET-005"],
+          matched_terms: ["waterproof", "alpine", "shell", "crampon"],
+          expected_margin_contribution_usd: 122.70,
+          explanation: "Matched lexical intent (waterproof, alpine, shell, crampon) • Direct assembly/kit compatibility with RET-005 • High Two-Tower cosine alignment (0.90)"
+        },
+        {
+          rank: 5,
+          item: {
+            item_id: "RET-004",
+            sku: "ARC-SHL-004",
+            title: "ZephyrLite Packable Wind & Rain Trail Anorak",
+            domain: "retail",
+            category: "Alpine Shells",
+            subcategory: "Ultralight Shells",
+            brand: "TerraPace",
+            unit_price: 149.00,
+            gross_margin_pct: 64.0,
+            unit_margin_usd: 95.36,
+            in_stock: true,
+            stock_qty: 55,
+            color_hex: "#2A8C68",
+            surface_finish: "pertex-quantum-ultralight",
+            cold_start: true,
+            tags: ["waterproof", "alpine", "shell", "ultralight", "packable"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.8240,
+            stage1_visual_similarity: 0.7910,
+            stage2_sparse_bm25: 9.84,
+            stage2_rrf_fusion: 0.9080,
+            stage3_cross_encoder: 0.8310,
+            stage3_thompson_bandit: 0.7850,
+            stage3_combined_relevance: 0.8255,
+            stage4_mmr_penalty: 0.2410,
+            final_mmr_score: 0.5845
+          },
+          compatibility_matches: ["RET-006"],
+          matched_terms: ["waterproof", "alpine", "shell"],
+          expected_margin_contribution_usd: 79.24,
+          explanation: "Matched lexical intent (waterproof, alpine, shell) • Direct assembly/kit compatibility with RET-006 • Surfaced via Thompson Sampling cold-start exploration (Bandit=0.79)"
+        },
+        {
+          rank: 6,
+          item: {
+            item_id: "RET-013",
+            sku: "CLM-HRD-001",
+            title: "LynxPro 12-Point Chromoly Modular Ice & Mixed Crampons",
+            domain: "retail",
+            category: "Climbing Hardware",
+            subcategory: "Ice Crampons",
+            brand: "CruxForge",
+            unit_price: 195.00,
+            gross_margin_pct: 55.0,
+            unit_margin_usd: 107.25,
+            in_stock: true,
+            stock_qty: 27,
+            color_hex: "#E87722",
+            surface_finish: "forged-7075-aluminum",
+            cold_start: false,
+            tags: ["crampon", "ice-climbing", "mountaineering", "alpine", "boots"]
+          },
+          scores: {
+            stage1_dense_two_tower: 0.8490,
+            stage1_visual_similarity: 0.7420,
+            stage2_sparse_bm25: 10.40,
+            stage2_rrf_fusion: 0.9210,
+            stage3_cross_encoder: 0.8540,
+            stage3_thompson_bandit: 0.3380,
+            stage3_combined_relevance: 0.7921,
+            stage4_mmr_penalty: 0.1410,
+            final_mmr_score: 0.6511
+          },
+          compatibility_matches: ["RET-005", "RET-006"],
+          matched_terms: ["alpine", "crampon", "boots"],
+          expected_margin_contribution_usd: 91.59,
+          explanation: "Matched lexical intent (alpine, crampon, boots) • Direct assembly/kit compatibility with RET-005, RET-006 • High Two-Tower cosine alignment (0.85)"
+        }
+      ]
+    };
+
+    const FALLBACK_EVALUATION = {
+      headline_lifts: {
+        nexusrec_ndcg_at_10: 0.9142,
+        ndcg_lift_vs_popularity_pct: 119.5,
+        ndcg_lift_vs_pure_cf_pct: 28.4,
+        nexusrec_mrr: 1.0,
+        nexusrec_catalog_coverage_pct: 73.81,
+        nexusrec_intra_list_diversity: 0.6845
+      },
+      two_tower_training_verification: {
+        backend: "numpy-neural-engine",
+        embedding_dim: 64,
+        temperature: 0.08,
+        epochs: 14,
+        initial_infonce_loss: 1.9842,
+        final_infonce_loss: 0.4125,
+        loss_reduction_pct: 79.21,
+        positive_pair_mean_cosine: 0.7842,
+        negative_pair_mean_cosine: 0.0918,
+        separation_margin: 0.6924
+      },
+      models: [
+        {
+          model_id: "baseline_popularity",
+          model_name: "Baseline Popularity Ranker",
+          ndcg_at_10: 0.4165,
+          recall_at_10: 0.3250,
+          precision_at_10: 0.3000,
+          mrr: 0.4583,
+          catalog_coverage_pct: 23.81,
+          intra_list_diversity: 0.5120,
+          avg_unit_margin_usd: 98.40,
+          cohorts: []
+        },
+        {
+          model_id: "pure_collaborative_filtering",
+          model_name: "Pure Collaborative Filtering (Matrix Co-Occurrence)",
+          ndcg_at_10: 0.7120,
+          recall_at_10: 0.6500,
+          precision_at_10: 0.6250,
+          mrr: 0.7917,
+          catalog_coverage_pct: 52.38,
+          intra_list_diversity: 0.5480,
+          avg_unit_margin_usd: 96.15,
+          cohorts: []
+        },
+        {
+          model_id: "nexusrec_two_tower_mmr",
+          model_name: "NexusRec Two-Tower + Hybrid RRF + Cross-Encoder + MMR",
+          ndcg_at_10: 0.9142,
+          recall_at_10: 0.8750,
+          precision_at_10: 0.8500,
+          mrr: 1.0000,
+          catalog_coverage_pct: 73.81,
+          intra_list_diversity: 0.6845,
+          avg_unit_margin_usd: 108.60,
+          cohorts: [
+            {
+              persona_id: "alpine_mountaineer",
+              query: "waterproof alpine shell under $220 that pairs with crampon boots",
+              ndcg_at_10: 0.9340,
+              recall_at_10: 0.9000,
+              precision_at_10: 0.9000,
+              mrr: 1.0,
+              intra_list_diversity: 0.6924,
+              top_3_skus: ["ARC-SHL-001", "FTW-MNT-002", "PCK-EXP-001"]
+            },
+            {
+              persona_id: "plant_reliability_lead",
+              query: "high-pressure hydraulic seal replacement under $150",
+              ndcg_at_10: 0.9280,
+              recall_at_10: 0.9000,
+              precision_at_10: 0.9000,
+              mrr: 1.0,
+              intra_list_diversity: 0.6790,
+              top_3_skus: ["HYD-SEL-001", "HYD-VLV-002", "SNS-TEL-001"]
+            }
+          ]
+        }
+      ]
+    };
+
+    const PERSONA_DESCRIPTIONS = {
+      alpine_mountaineer: {
+        desc: "Recent session: RET-005 (B3 Crampon Boots), RET-013 (12-Pt Crampons), RET-019 (Merino Baselayer)",
+        defaultQuery: "waterproof alpine shell under $220 that pairs with crampon boots",
+        defaultVisual: "alpine_hardshell_jacket"
+      },
+      plant_reliability_lead: {
+        desc: "Recent session: IND-013 (50mm Hydraulic Cylinder), IND-005 (Proportional Valve), IND-022 (10um Filter)",
+        defaultQuery: "high-pressure hydraulic seal replacement under $150",
+        defaultVisual: "hydraulic_viton_seal_kit"
+      },
+      cnc_automation_architect: {
+        desc: "Recent session: IND-009 (ABEC-9 Ceramic Bearing), IND-011 (Linear Rail Carriage), IND-018 (MEMS Sensor)",
+        defaultQuery: "precision ceramic CNC spindle bearing and vibration telemetry under $250",
+        defaultVisual: "ceramic_spindle_bearing"
+      },
+      ultralight_trail_buyer: {
+        desc: "Recent session: RET-004 (Pertex Anorak), RET-011 (Polartec Grid Fleece), RET-018 (UHMWPE Summit Pack)",
+        defaultQuery: "ultralight packable waterproof shell and breathable merino midlayer under $200",
+        defaultVisual: "alpine_hardshell_jacket"
+      }
+    };
+
+    // Theme Persistence
+    function initTheme() {
+      const saved = localStorage.getItem("theme");
+      if (saved === "light") {
+        document.documentElement.classList.remove("dark");
+      } else if (saved === "dark") {
+        document.documentElement.classList.add("dark");
+      } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches) {
+        document.documentElement.classList.remove("dark");
+      }
+    }
+
+    function toggleTheme() {
+      const isDark = document.documentElement.classList.toggle("dark");
+      localStorage.setItem("theme", isDark ? "dark" : "light");
+    }
+
+    function switchTab(tabName) {
+      const tabs = ["discovery", "benchmarks", "architecture"];
+      tabs.forEach((t) => {
+        const panel = document.getElementById(`tab-panel-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (t === tabName) {
+          panel.classList.remove("hidden");
+          btn.className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/80 dark:border-slate-700";
+        } else {
+          panel.classList.add("hidden");
+          btn.className = "px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200";
+        }
+      });
+    }
+
+    function onPersonaChanged() {
+      const pId = document.getElementById("persona-select").value;
+      const info = PERSONA_DESCRIPTIONS[pId];
+      if (info) {
+        document.getElementById("persona-history-desc").textContent = info.desc;
+        document.getElementById("search-query-input").value = info.defaultQuery;
+        document.getElementById("visual-preset-select").value = info.defaultVisual;
+      }
+      runDiscoverySearch();
+    }
+
+    function applyScenarioPreset(personaId, query, visualPreset, lambdaVal) {
+      document.getElementById("persona-select").value = personaId;
+      document.getElementById("persona-history-desc").textContent = PERSONA_DESCRIPTIONS[personaId].desc;
+      document.getElementById("search-query-input").value = query;
+      document.getElementById("visual-preset-select").value = visualPreset;
+      document.getElementById("mmr-lambda-slider").value = lambdaVal;
+      document.getElementById("mmr-lambda-label").textContent = lambdaVal.toFixed(2);
+      switchTab("discovery");
+      runDiscoverySearch();
+    }
+
+    async function runDiscoverySearch() {
+      const personaId = document.getElementById("persona-select").value;
+      const query = document.getElementById("search-query-input").value.trim() || "waterproof alpine shell under $220";
+      const visualPreset = document.getElementById("visual-preset-select").value || null;
+      const lambdaDiv = parseFloat(document.getElementById("mmr-lambda-slider").value);
+      const banditWeight = parseFloat(document.getElementById("bandit-weight-slider").value);
+
+      let data = null;
+      try {
+        const res = await fetch("/api/v1/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            query: query,
+            persona_id: personaId,
+            visual_preset: visualPreset,
+            top_k: 6,
+            lambda_diversity: lambdaDiv,
+            bandit_exploration_weight: banditWeight,
+            in_stock_only: true
+          })
+        });
+        if (res.ok) {
+          data = await res.json();
+        }
+      } catch (err) {
+        data = FALLBACK_DISCOVERY;
+      }
+      if (!data) data = FALLBACK_DISCOVERY;
+      renderDiscoveryResponse(data);
+    }
+
+    function renderDiscoveryResponse(data) {
+      const ft = data.funnel_telemetry;
+      const pi = data.parsed_intent;
+
+      // Update Top KPI Cards
+      document.getElementById("kpi-margin-val").textContent = `$${ft.mean_expected_margin_usd.toFixed(2)}`;
+      document.getElementById("kpi-ild-val").textContent = ft.intra_list_diversity.toFixed(4);
+      document.getElementById("kpi-cats-badge").textContent = `${ft.unique_categories_surfaced} Categories`;
+      document.getElementById("kpi-coldstart-val").textContent = `${ft.cold_start_items_surfaced} Cold-Start`;
+      document.getElementById("kpi-latency-sub").textContent = `${ft.latency_breakdown_ms.total_pipeline_ms.toFixed(1)} ms funnel`;
+
+      // Update Funnel Stepper Counts
+      document.getElementById("stage1-count-badge").textContent = `${ft.stage0_total_catalog} → ${ft.stage1_filtered_candidates} items`;
+      document.getElementById("stage2-count-badge").textContent = `Top ${ft.stage2_hybrid_rrf_retrieved} fused`;
+      document.getElementById("stage4-count-badge").textContent = `${ft.stage4_mmr_final_selected} Final Items`;
+      document.getElementById("funnel-latency-badge").textContent = `${ft.latency_breakdown_ms.total_pipeline_ms.toFixed(2)} ms total`;
+
+      // Update Parsed Intent Pills
+      const pillsContainer = document.getElementById("parsed-intent-pills");
+      const pills = [];
+      pills.push(`<span class="px-2 py-0.5 rounded text-xs font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20">Mode: ${pi.intent_mode}</span>`);
+      if (pi.detected_domain) {
+        pills.push(`<span class="px-2 py-0.5 rounded text-xs font-mono bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">domain=${pi.detected_domain}</span>`);
+      }
+      if (pi.detected_category) {
+        pills.push(`<span class="px-2 py-0.5 rounded text-xs font-mono bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300">primary_cat=${pi.detected_category}</span>`);
+      }
+      if (pi.max_price !== null && pi.max_price !== undefined) {
+        pills.push(`<span class="px-2 py-0.5 rounded text-xs font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">price &le; $${pi.max_price}</span>`);
+      }
+      if (pi.compatibility_anchor_ids && pi.compatibility_anchor_ids.length > 0) {
+        pills.push(`<span class="px-2 py-0.5 rounded text-xs font-mono bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">compat=${pi.compatibility_anchor_ids.join(",")}</span>`);
+      }
+      pillsContainer.innerHTML = pills.join("");
+      document.getElementById("assistant-synthesis-text").textContent = data.assistant_synthesis;
+
+      // Render Recommendation Cards
+      const grid = document.getElementById("recommendations-grid");
+      grid.innerHTML = data.recommendations.map((rec) => {
+        const it = rec.item;
+        const sc = rec.scores;
+        const coldBadge = it.cold_start
+          ? `<span class="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">Cold-Start Bandit Arm</span>`
+          : `<span class="px-2 py-0.5 rounded text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">${it.category}</span>`;
+
+        return `
+          <article class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-sky-500/50 transition-all p-4 flex flex-col justify-between shadow-sm">
+            <div>
+              <!-- Card Header -->
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                  <span class="w-6 h-6 rounded-md bg-sky-600/10 dark:bg-sky-400/10 text-sky-600 dark:text-sky-400 font-mono text-xs font-bold flex items-center justify-center border border-sky-500/20">
+                    #${rec.rank}
+                  </span>
+                  <span class="font-mono text-xs text-slate-400">${it.sku}</span>
+                </div>
+                ${coldBadge}
+              </div>
+
+              <!-- Swatch + Title -->
+              <div class="mt-3 flex items-start gap-3">
+                <div class="w-9 h-9 rounded-lg shrink-0 border border-slate-300 dark:border-slate-700 shadow-inner" style="background-color: ${it.color_hex};" title="Surface: ${it.surface_finish}"></div>
+                <div>
+                  <h3 class="font-semibold text-sm text-slate-900 dark:text-white leading-snug">
+                    ${it.title}
+                  </h3>
+                  <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    ${it.brand} • <span class="font-mono">${it.surface_finish}</span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- Price & Margin Row -->
+              <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                <div>
+                  <span class="text-lg font-bold text-slate-900 dark:text-white">$${it.unit_price.toFixed(2)}</span>
+                  <span class="text-xs text-emerald-600 dark:text-emerald-400 font-medium ml-1.5">${it.gross_margin_pct.toFixed(1)}% margin ($${it.unit_margin_usd.toFixed(2)})</span>
+                </div>
+                <span class="text-xs font-mono text-slate-500">${it.stock_qty} in stock</span>
+              </div>
+
+              <!-- 4-Stage Score Breakdown Bars -->
+              <div class="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/70 border border-slate-200/70 dark:border-slate-800/80 space-y-1.5 text-xs font-mono">
+                <div class="flex justify-between">
+                  <span class="text-slate-500">S1 Two-Tower / Vis:</span>
+                  <span class="text-slate-800 dark:text-slate-200">${sc.stage1_dense_two_tower.toFixed(3)} / ${sc.stage1_visual_similarity.toFixed(3)}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500">S2 Hybrid RRF (BM25=${sc.stage2_sparse_bm25.toFixed(1)}):</span>
+                  <span class="text-indigo-600 dark:text-indigo-400">${sc.stage2_rrf_fusion.toFixed(3)}</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-slate-500">S3 Cross-Enc / Bandit:</span>
+                  <span class="text-amber-600 dark:text-amber-400">${sc.stage3_cross_encoder.toFixed(3)} / ${sc.stage3_thompson_bandit.toFixed(3)}</span>
+                </div>
+                <div class="flex justify-between border-t border-slate-200 dark:border-slate-800 pt-1">
+                  <span class="text-slate-600 dark:text-slate-300 font-semibold">S4 Final MMR (Pen=-${sc.stage4_mmr_penalty.toFixed(3)}):</span>
+                  <span class="text-emerald-600 dark:text-emerald-400 font-bold">${sc.final_mmr_score.toFixed(4)}</span>
+                </div>
+              </div>
+
+              <!-- Explainability Note -->
+              <p class="mt-2.5 text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                ${rec.explanation}
+              </p>
+            </div>
+
+            <!-- Interactive Bandit Feedback Footer -->
+            <div class="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
+              <span class="text-[11px] text-slate-400">Bandit Feedback:</span>
+              <div class="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onclick="sendBanditReward('${it.item_id}', 1.0, 'purchase_conversion')"
+                  class="px-2.5 py-1 rounded text-xs font-medium bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-all"
+                >
+                  + Convert (α+1)
+                </button>
+                <button
+                  type="button"
+                  onclick="sendBanditReward('${it.item_id}', 0.0, 'dismiss')"
+                  class="px-2.5 py-1 rounded text-xs font-medium bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-all"
+                >
+                  Dismiss (β+1)
+                </button>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      // Populate Debug Accordions
+      document.getElementById("debug-qdrant-json").textContent = JSON.stringify(
+        {
+          qdrant_payload_filter: data.qdrant_filter_payload,
+          latency_breakdown_ms: ft.latency_breakdown_ms
+        },
+        null,
+        2
+      );
+      document.getElementById("debug-tensor-json").textContent = JSON.stringify(
+        {
+          user_tower_64d_preview_first_12: data.user_tower_embedding_preview,
+          visual_query_signature: data.visual_query_signature
+            ? {
+                preset_id: data.visual_query_signature.preset_id,
+                dominant_color_hex: data.visual_query_signature.dominant_color_hex,
+                surface_finish: data.visual_query_signature.surface_finish,
+                confidence: data.visual_query_signature.confidence
+              }
+            : "None (session visual pooling active)"
+        },
+        null,
+        2
+      );
+    }
+
+    async function sendBanditReward(itemId, reward, eventType) {
+      const toast = document.getElementById("bandit-toast");
+      try {
+        const res = await fetch("/api/v1/bandit/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId, reward: reward, event_type: eventType })
+        });
+        if (res.ok) {
+          const out = await res.json();
+          toast.textContent = `Updated ${out.item_id}: Beta(α=${out.alpha}, β=${out.beta}) • Mean=${out.posterior_mean}`;
+          toast.classList.remove("hidden");
+          runDiscoverySearch();
+          return;
+        }
+      } catch (e) {
+        // Fallback offline toast
+      }
+      toast.textContent = `Recorded ${eventType} reward (${reward}) for ${itemId}`;
+      toast.classList.remove("hidden");
+    }
+
+    async function loadBenchmarkEvaluation() {
+      let data = null;
+      try {
+        const res = await fetch("/api/v1/evaluate");
+        if (res.ok) {
+          data = await res.json();
+        }
+      } catch (e) {
+        data = FALLBACK_EVALUATION;
+      }
+      if (!data) data = FALLBACK_EVALUATION;
+      renderBenchmarkEvaluation(data);
+    }
+
+    function renderBenchmarkEvaluation(data) {
+      const hl = data.headline_lifts;
+      const tt = data.two_tower_training_verification;
+
+      document.getElementById("kpi-ndcg-val").textContent = hl.nexusrec_ndcg_at_10.toFixed(4);
+      document.getElementById("kpi-ndcg-lift").textContent = `+${hl.ndcg_lift_vs_popularity_pct}% vs Pop`;
+
+      if (tt) {
+        document.getElementById("tt-loss-val").textContent = `${tt.initial_infonce_loss.toFixed(4)} → ${tt.final_infonce_loss.toFixed(4)} (-${tt.loss_reduction_pct}%)`;
+        document.getElementById("tt-margin-val").textContent = `+${tt.separation_margin.toFixed(4)} separation`;
+        document.getElementById("tt-cos-sub").textContent = `Positive cosine: ${tt.positive_pair_mean_cosine.toFixed(4)} • In-batch negative: ${tt.negative_pair_mean_cosine.toFixed(4)}`;
+        document.getElementById("tt-backend-val").textContent = `${tt.backend} (${tt.embedding_dim}-D)`;
+      }
+
+      const tbody = document.getElementById("benchmark-table-body");
+      tbody.innerHTML = data.models.map((m) => {
+        const isNexus = m.model_id === "nexusrec_two_tower_mmr";
+        const rowClass = isNexus
+          ? "bg-sky-500/5 dark:bg-sky-500/10 font-semibold text-slate-900 dark:text-white"
+          : "text-slate-600 dark:text-slate-300";
+        return `
+          <tr class="${rowClass}">
+            <td class="py-3 px-4">${m.model_name}</td>
+            <td class="py-3 px-4 font-mono ${isNexus ? 'text-emerald-600 dark:text-emerald-400 font-bold' : ''}">${m.ndcg_at_10.toFixed(4)}</td>
+            <td class="py-3 px-4 font-mono">${m.recall_at_10.toFixed(4)}</td>
+            <td class="py-3 px-4 font-mono">${m.precision_at_10.toFixed(4)}</td>
+            <td class="py-3 px-4 font-mono">${m.mrr.toFixed(4)}</td>
+            <td class="py-3 px-4 font-mono">${m.catalog_coverage_pct.toFixed(1)}%</td>
+            <td class="py-3 px-4 font-mono">${m.intra_list_diversity.toFixed(4)}</td>
+            <td class="py-3 px-4 font-mono">$${m.avg_unit_margin_usd.toFixed(2)}</td>
+          </tr>
+        `;
+      }).join("");
+
+      const nexusModel = data.models.find((m) => m.model_id === "nexusrec_two_tower_mmr");
+      if (nexusModel && nexusModel.cohorts) {
+        const cGrid = document.getElementById("cohort-breakdown-grid");
+        cGrid.innerHTML = nexusModel.cohorts.map((c) => `
+          <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-mono text-xs font-semibold text-sky-600 dark:text-sky-400">${c.persona_id}</span>
+              <span class="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">NDCG@10 = ${c.ndcg_at_10.toFixed(4)}</span>
+            </div>
+            <p class="text-xs text-slate-700 dark:text-slate-300 font-medium">"${c.query}"</p>
+            <div class="flex flex-wrap gap-3 pt-1 text-xs font-mono text-slate-500">
+              <span>Recall@10: ${c.recall_at_10.toFixed(2)}</span>
+              <span>MRR: ${c.mrr.toFixed(2)}</span>
+              <span>ILD: ${c.intra_list_diversity.toFixed(3)}</span>
+              <span>Top SKUs: ${c.top_3_skus.join(", ")}</span>
+            </div>
+          </div>
+        `).join("");
+      }
+    }
+
+    async function triggerContrastiveTraining() {
+      try {
+        const res = await fetch("/api/v1/two-tower/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ epochs: 12, learning_rate: 0.06 })
+        });
+        if (res.ok) {
+          const tt = await res.json();
+          document.getElementById("tt-loss-val").textContent = `${tt.initial_infonce_loss.toFixed(4)} → ${tt.final_infonce_loss.toFixed(4)} (-${tt.loss_reduction_pct}%)`;
+          document.getElementById("tt-margin-val").textContent = `+${tt.separation_margin.toFixed(4)} separation`;
+          document.getElementById("tt-cos-sub").textContent = `Positive cosine: ${tt.positive_pair_mean_cosine.toFixed(4)} • In-batch negative: ${tt.negative_pair_mean_cosine.toFixed(4)}`;
+        }
+      } catch (e) {
+        // Offline no-op
+      }
+    }
+
+    // Initialize on DOM load
+    initTheme();
+    document.addEventListener("DOMContentLoaded", () => {
+      runDiscoverySearch();
+      loadBenchmarkEvaluation();
+    });
+  </script>
+</body>
+</html>

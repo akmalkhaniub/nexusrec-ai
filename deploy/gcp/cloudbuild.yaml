@@ -1,0 +1,63 @@
+# ==============================================================================
+# Google Cloud Build CI/CD Pipeline for NexusRec AI
+# 1. Runs pytest unit + RecSys evaluation suite (NDCG@10 & InfoNCE loss gate)
+# 2. Builds multi-stage container image & pushes to Artifact Registry
+# 3. Deploys Knative scale-to-zero service to Google Cloud Run
+# ==============================================================================
+steps:
+  # Step 1: Execute unit tests and RecSys benchmark gate
+  - name: "python:3.13-slim"
+    id: "pytest-eval-gate"
+    entrypoint: "bash"
+    args:
+      - "-c"
+      - |
+        pip install --no-cache-dir -r requirements.txt
+        pytest -v
+
+  # Step 2: Build production container image
+  - name: "gcr.io/cloud-builders/docker"
+    id: "docker-build"
+    waitFor: ["pytest-eval-gate"]
+    args:
+      - "build"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/nexusrec-ai:${SHORT_SHA}"
+      - "-t"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/nexusrec-ai:latest"
+      - "."
+
+  # Step 3: Push image to Google Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    id: "docker-push"
+    waitFor: ["docker-build"]
+    args:
+      - "push"
+      - "--all-tags"
+      - "${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/nexusrec-ai"
+
+  # Step 4: Deploy to Google Cloud Run (Scale-to-Zero)
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    id: "cloud-run-deploy"
+    waitFor: ["docker-push"]
+    entrypoint: "gcloud"
+    args:
+      - "run"
+      - "deploy"
+      - "nexusrec-ai-discovery"
+      - "--image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_ARTIFACT_REPO}/nexusrec-ai:${SHORT_SHA}"
+      - "--region=${_REGION}"
+      - "--platform=managed"
+      - "--allow-unauthenticated"
+      - "--port=8000"
+      - "--cpu=2"
+      - "--memory=4Gi"
+      - "--min-instances=0"
+      - "--max-instances=10"
+
+substitutions:
+  _REGION: "us-central1"
+  _ARTIFACT_REPO: "nexusrec-repo"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
