@@ -63,6 +63,7 @@ class RerankedRecommendation:
     stage2_bm25_score: float
     stage2_rrf_score: float
     stage3_cross_encoder_score: float
+    stage3_sasrec_transition_score: float
     stage3_bandit_sample: float
     stage3_pre_mmr_score: float
     stage4_mmr_diversity_penalty: float
@@ -82,6 +83,7 @@ class RerankedRecommendation:
                 "stage2_sparse_bm25": self.stage2_bm25_score,
                 "stage2_rrf_fusion": self.stage2_rrf_score,
                 "stage3_cross_encoder": self.stage3_cross_encoder_score,
+                "stage3_sasrec_sequential": self.stage3_sasrec_transition_score,
                 "stage3_thompson_bandit": self.stage3_bandit_sample,
                 "stage3_combined_relevance": self.stage3_pre_mmr_score,
                 "stage4_mmr_penalty": self.stage4_mmr_diversity_penalty,
@@ -225,8 +227,9 @@ class CrossEncoderAndMMRReranker:
         lambda_diversity: float = 0.72,
         bandit_exploration_weight: float = 0.12,
         price_ceiling: float | None = None,
+        sasrec_transition_scores: dict[str, float] | None = None,
     ) -> dict[str, Any]:
-        """Run Stage 3 (Cross-Encoder + Bandit) and Stage 4 (MMR Diversity Filter)."""
+        """Run Stage 3 (Cross-Encoder + SASRec + Bandit) and Stage 4 (MMR Diversity Filter)."""
         if not candidates:
             return {
                 "recommendations": [],
@@ -254,18 +257,25 @@ class CrossEncoderAndMMRReranker:
         X_scaled = self.scaler.transform(X_mat)
         raw_ce_preds = self.gbdt_scorer.predict(X_scaled)
 
-        # Stage 3: Combine Cross-Encoder score with Thompson Sampling Bandit exploration
+        # Stage 3: Combine Cross-Encoder score with SASRec Sequential Transition & Thompson Bandit
         scored_pool: list[dict[str, Any]] = []
         for idx, cand in enumerate(candidates):
             ce_score = float(np.clip(raw_ce_preds[idx], 0.05, 0.99))
+            sasrec_score = (
+                float(sasrec_transition_scores.get(cand.item.item_id, ce_score))
+                if sasrec_transition_scores
+                else round(ce_score * 0.95, 4)
+            )
             bandit_sample, arm_state = self.bandit.sample_arm(cand.item.item_id)
-            pre_mmr = (1.0 - bandit_exploration_weight) * ce_score + (
+            blended_ce_sasrec = 0.78 * ce_score + 0.22 * sasrec_score
+            pre_mmr = (1.0 - bandit_exploration_weight) * blended_ce_sasrec + (
                 bandit_exploration_weight * bandit_sample
             )
             scored_pool.append(
                 {
                     "candidate": cand,
                     "ce_score": round(ce_score, 4),
+                    "sasrec_score": round(sasrec_score, 4),
                     "bandit_sample": round(bandit_sample, 4),
                     "arm_state": arm_state,
                     "pre_mmr_score": round(pre_mmr, 4),
@@ -353,6 +363,7 @@ class CrossEncoderAndMMRReranker:
                     stage2_bm25_score=cand.sparse_bm25_score,
                     stage2_rrf_score=cand.rrf_fusion_score,
                     stage3_cross_encoder_score=sel["ce_score"],
+                    stage3_sasrec_transition_score=sel["sasrec_score"],
                     stage3_bandit_sample=sel["bandit_sample"],
                     stage3_pre_mmr_score=sel["pre_mmr_score"],
                     stage4_mmr_diversity_penalty=sel["mmr_penalty"],

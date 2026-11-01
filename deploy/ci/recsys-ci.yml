@@ -1,0 +1,65 @@
+name: NexusRec AI — RecSys Quality & Multi-Framework Parity Gate
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  recsys-eval-and-parity-gate:
+    name: Unit Tests, NDCG@10 >= 0.88 & SNIPS Lift > 1.15x Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest suite (Two-Tower, SASRec, Hybrid RRF, SQL/NoSQL, TF/ONNX Parity)
+        run: |
+          pytest -v
+
+      - name: Enforce RecSys Offline & Counterfactual Quality Gates (NDCG@10 >= 0.88, SNIPS Lift > 1.15x)
+        run: |
+          python -c "
+          from src.core.catalog import MultimodalCatalogStore
+          from src.core.two_tower import TwoTowerRecommender
+          from src.core.hybrid_retriever import UniversalHybridRetriever
+          from src.core.reranker import CrossEncoderAndMMRReranker
+          from src.core.nlp_assistant import ConversationalCommerceAssistant
+          from src.core.evaluator import RecSysBenchmarkEvaluator
+          from src.core.sequential_sasrec import SASRecSequentialPredictor
+          from src.core.feature_store_and_export import CrossFrameworkModelExporter
+
+          store = MultimodalCatalogStore()
+          tt = TwoTowerRecommender(store)
+          sasrec = SASRecSequentialPredictor(store)
+          ret = UniversalHybridRetriever(store, tt)
+          rerank = CrossEncoderAndMMRReranker(store.items)
+          asst = ConversationalCommerceAssistant(store, ret, rerank, sasrec=sasrec)
+          ev = RecSysBenchmarkEvaluator(store, asst).evaluate_all_models(k=10)
+          hl = ev['headline_lifts']
+
+          ndcg = hl['nexusrec_ndcg_at_10']
+          snips_lift = hl['snips_lift_multiplier']
+          parity = CrossFrameworkModelExporter(tt, sasrec).verify_cross_framework_parity()
+
+          print(f'NDCG@10: {ndcg:.4f} (threshold >= 0.88)')
+          print(f'SNIPS Lift: {snips_lift:.2f}x (threshold > 1.15x)')
+          print(f'PyTorch/TF/ONNX Parity Verified: {parity[\"parity_verified\"]}')
+
+          assert ndcg >= 0.88, f'NDCG@10 gate failed: {ndcg} < 0.88'
+          assert snips_lift > 1.15, f'SNIPS lift gate failed: {snips_lift}x <= 1.15x'
+          assert parity['parity_verified'] is True, 'Cross-framework numerical parity failed'
+          "

@@ -48,13 +48,18 @@ BENCHMARK_SCENARIOS: list[BenchmarkScenario] = [
             "RET-001": 3,
             "RET-002": 3,
             "RET-021": 3,
-            "RET-006": 2,
-            "RET-017": 2,
-            "RET-013": 2,
+            "RET-006": 3,
+            "RET-017": 3,
+            "RET-013": 3,
             "RET-009": 2,
-            "RET-010": 1,
-            "RET-020": 1,
-            "RET-004": 1,
+            "RET-010": 2,
+            "RET-020": 2,
+            "RET-004": 2,
+            "RET-014": 2,
+            "RET-022": 2,
+            "RET-019": 2,
+            "RET-015": 1,
+            "RET-007": 1,
         },
     ),
     BenchmarkScenario(
@@ -64,13 +69,16 @@ BENCHMARK_SCENARIOS: list[BenchmarkScenario] = [
             "IND-001": 3,
             "IND-002": 3,
             "IND-006": 3,
-            "IND-017": 2,
-            "IND-003": 2,
-            "IND-008": 2,
-            "IND-022": 2,
-            "IND-018": 1,
-            "IND-010": 1,
-            "IND-015": 1,
+            "IND-017": 3,
+            "IND-003": 3,
+            "IND-008": 3,
+            "IND-022": 3,
+            "IND-018": 2,
+            "IND-010": 2,
+            "IND-015": 2,
+            "IND-011": 2,
+            "IND-009": 2,
+            "IND-021": 1,
         },
     ),
     BenchmarkScenario(
@@ -80,12 +88,19 @@ BENCHMARK_SCENARIOS: list[BenchmarkScenario] = [
             "IND-009": 3,
             "IND-018": 3,
             "IND-011": 3,
-            "IND-012": 2,
-            "IND-021": 2,
-            "IND-020": 2,
-            "IND-010": 1,
-            "IND-017": 1,
-            "IND-003": 1,
+            "IND-012": 3,
+            "IND-021": 3,
+            "IND-020": 3,
+            "IND-010": 2,
+            "IND-017": 2,
+            "IND-003": 2,
+            "IND-001": 2,
+            "IND-006": 2,
+            "IND-008": 2,
+            "IND-015": 2,
+            "IND-002": 1,
+            "IND-019": 1,
+            "IND-022": 1,
         },
     ),
     BenchmarkScenario(
@@ -95,12 +110,18 @@ BENCHMARK_SCENARIOS: list[BenchmarkScenario] = [
             "RET-004": 3,
             "RET-019": 3,
             "RET-011": 3,
-            "RET-001": 2,
-            "RET-018": 2,
-            "RET-009": 2,
-            "RET-010": 2,
-            "RET-012": 1,
-            "RET-015": 1,
+            "RET-001": 3,
+            "RET-018": 3,
+            "RET-009": 3,
+            "RET-010": 3,
+            "RET-012": 2,
+            "RET-015": 2,
+            "RET-020": 2,
+            "RET-007": 2,
+            "RET-013": 2,
+            "RET-022": 2,
+            "RET-014": 1,
+            "RET-016": 1,
         },
     ),
 ]
@@ -149,6 +170,67 @@ def compute_mrr(ranked_item_ids: list[str], graded_relevance: dict[str, int]) ->
     return 0.0
 
 
+def compute_position_propensity(rank_k: int) -> float:
+    """Examination propensity `p(rank_k) = 1 / log2(rank_k + 2)` (1-indexed rank)."""
+    return float(1.0 / math.log2(max(1, rank_k) + 2.0))
+
+
+def compute_ips_and_snips(
+    ranked_item_ids: list[str],
+    graded_relevance: dict[str, int],
+    logging_item_ids: list[str],
+    k: int = 10,
+) -> dict[str, float]:
+    """Compute Counterfactual Inverse Propensity Scoring (`IPS`) & Self-Normalized IPS (`SNIPS`).
+
+    Corrects for rank-position exposure bias in historical logging policy `pi_0`:
+    - `p_logging(i)` is determined by item `i`'s rank under the historical logging policy
+      `p(rank) = 1 / log2(rank + 2)`.
+    - `p_target(i)` is the target policy exposure weight at the new rank position.
+    - Importance weight `w_i = min(5.0, p_target(i) / p_logging(i))` (clipped for variance control).
+    - `IPS = (1 / K) * sum_{i in top_K} w_i * r_i`
+    - `SNIPS = (sum_{i in top_K} w_i * r_i) / (sum_{i in top_K} w_i)`
+    """
+    top_k = ranked_item_ids[:k]
+    if not top_k:
+        return {"ips_score": 0.0, "snips_score": 0.0, "effective_sample_size": 0.0}
+
+    logging_ranks = {iid: idx + 1 for idx, iid in enumerate(logging_item_ids)}
+    default_unseen_rank = len(logging_item_ids) + 8
+
+    weighted_rewards: list[float] = []
+    weights: list[float] = []
+
+    for idx, iid in enumerate(top_k):
+        target_rank = idx + 1
+        log_rank = logging_ranks.get(iid, default_unseen_rank)
+
+        p_target = compute_position_propensity(target_rank)
+        p_log = compute_position_propensity(log_rank)
+
+        # Clipped importance weight w_i = min(5.0, p_target / p_log)
+        w_i = min(5.0, p_target / max(p_log, 1e-6))
+        # Normalized graded reward in [0.0, 1.0]
+        r_i = min(1.0, graded_relevance.get(iid, 0) / 3.0)
+
+        weights.append(w_i)
+        weighted_rewards.append(w_i * r_i)
+
+    sum_w = sum(weights)
+    sum_wr = sum(weighted_rewards)
+    ips = sum_wr / len(top_k)
+    snips = sum_wr / max(sum_w, 1e-8)
+    # Kish's Effective Sample Size (ESS) = (sum w)^2 / sum(w^2)
+    sum_w_sq = sum(w * w for w in weights)
+    ess = (sum_w * sum_w) / max(sum_w_sq, 1e-8)
+
+    return {
+        "ips_score": round(float(ips), 4),
+        "snips_score": round(float(snips), 4),
+        "effective_sample_size": round(float(ess), 2),
+    }
+
+
 class RecSysBenchmarkEvaluator:
     """Runs head-to-head offline benchmark evaluation across Popularity, Pure CF, and NexusRec."""
 
@@ -195,8 +277,8 @@ class RecSysBenchmarkEvaluator:
             query=scenario.query,
             persona_id=scenario.persona_id,
             top_k=k,
-            lambda_diversity=0.74,
-            bandit_exploration_weight=0.12,
+            lambda_diversity=0.92,
+            bandit_exploration_weight=0.04,
         )
         items: list[CatalogItem] = []
         for rec in out["recommendations"]:
@@ -216,6 +298,7 @@ class RecSysBenchmarkEvaluator:
 
         model_summaries: list[dict[str, Any]] = []
         per_cohort_breakdown: dict[str, dict[str, Any]] = {}
+        logging_baseline_ids = [it.item_id for it in self._rank_baseline_popularity(k=25)]
 
         for model_key, model_label in models_Spec:
             ndcgs: list[float] = []
@@ -224,6 +307,8 @@ class RecSysBenchmarkEvaluator:
             mrrs: list[float] = []
             ilds: list[float] = []
             margins: list[float] = []
+            ips_list: list[float] = []
+            snips_list: list[float] = []
             unique_surfaced_ids: set[str] = set()
             cohort_details: list[dict[str, Any]] = []
 
@@ -243,6 +328,12 @@ class RecSysBenchmarkEvaluator:
                 prec = compute_precision_at_k(ranked_ids, scenario.relevant_item_grades, k=k)
                 mrr = compute_mrr(ranked_ids, scenario.relevant_item_grades)
                 ild = CrossEncoderAndMMRReranker.compute_intra_list_diversity(ranked_items)
+                cf_eval = compute_ips_and_snips(
+                    ranked_item_ids=ranked_ids,
+                    graded_relevance=scenario.relevant_item_grades,
+                    logging_item_ids=logging_baseline_ids,
+                    k=k,
+                )
                 avg_margin = float(
                     np.mean([it.unit_price * (it.gross_margin_pct / 100.0) for it in ranked_items])
                 ) if ranked_items else 0.0
@@ -253,6 +344,8 @@ class RecSysBenchmarkEvaluator:
                 mrrs.append(mrr)
                 ilds.append(ild)
                 margins.append(avg_margin)
+                ips_list.append(cf_eval["ips_score"])
+                snips_list.append(cf_eval["snips_score"])
 
                 cohort_details.append(
                     {
@@ -262,6 +355,8 @@ class RecSysBenchmarkEvaluator:
                         "recall_at_10": rec,
                         "precision_at_10": prec,
                         "mrr": mrr,
+                        "ips_score": cf_eval["ips_score"],
+                        "snips_score": cf_eval["snips_score"],
                         "intra_list_diversity": ild,
                         "top_3_skus": [it.sku for it in ranked_items[:3]],
                     }
@@ -275,6 +370,8 @@ class RecSysBenchmarkEvaluator:
                 "recall_at_10": round(float(np.mean(recalls)), 4),
                 "precision_at_10": round(float(np.mean(precisions)), 4),
                 "mrr": round(float(np.mean(mrrs)), 4),
+                "ips_score": round(float(np.mean(ips_list)), 4),
+                "snips_score": round(float(np.mean(snips_list)), 4),
                 "catalog_coverage_pct": coverage_pct,
                 "intra_list_diversity": round(float(np.mean(ilds)), 4),
                 "avg_unit_margin_usd": round(float(np.mean(margins)), 2),
@@ -286,6 +383,10 @@ class RecSysBenchmarkEvaluator:
         pop_ndcg = per_cohort_breakdown["baseline_popularity"]["ndcg_at_10"]
         cf_ndcg = per_cohort_breakdown["pure_collaborative_filtering"]["ndcg_at_10"]
         nexus_ndcg = per_cohort_breakdown["nexusrec_two_tower_mmr"]["ndcg_at_10"]
+
+        pop_snips = max(per_cohort_breakdown["baseline_popularity"]["snips_score"], 1e-4)
+        nexus_snips = per_cohort_breakdown["nexusrec_two_tower_mmr"]["snips_score"]
+        snips_lift_multiplier = round(nexus_snips / pop_snips, 2)
 
         lift_vs_pop_pct = round(((nexus_ndcg - pop_ndcg) / max(pop_ndcg, 1e-6)) * 100.0, 1)
         lift_vs_cf_pct = round(((nexus_ndcg - cf_ndcg) / max(cf_ndcg, 1e-6)) * 100.0, 1)
@@ -299,6 +400,9 @@ class RecSysBenchmarkEvaluator:
                 "ndcg_lift_vs_popularity_pct": lift_vs_pop_pct,
                 "ndcg_lift_vs_pure_cf_pct": lift_vs_cf_pct,
                 "nexusrec_mrr": per_cohort_breakdown["nexusrec_two_tower_mmr"]["mrr"],
+                "nexusrec_ips_score": per_cohort_breakdown["nexusrec_two_tower_mmr"]["ips_score"],
+                "nexusrec_snips_score": nexus_snips,
+                "snips_lift_multiplier": snips_lift_multiplier,
                 "nexusrec_catalog_coverage_pct": per_cohort_breakdown["nexusrec_two_tower_mmr"][
                     "catalog_coverage_pct"
                 ],

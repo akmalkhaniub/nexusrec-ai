@@ -12,11 +12,11 @@
 
 Evaluated across **4 enterprise buyer cohorts** (*Technical Alpinist*, *Hydraulic Plant Reliability Engineer*, *CNC & Robotics Lead*, and *Ultralight Gear Merchandiser*) over the **44-item multimodal catalog**:
 
-| Recommender Architecture | `NDCG@10` | `Recall@10` | `Precision@10` | `MRR` | Catalog Coverage | Diversity (`ILD`) | Avg Unit Margin |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Baseline Popularity Ranker** | `0.4165` | `0.3250` | `0.3000` | `0.4583` | `23.8%` | `0.5120` | `$98.40` |
-| **Pure Collaborative Filtering (Co-Occurrence)** | `0.7120` | `0.6500` | `0.6250` | `0.7917` | `52.4%` | `0.5480` | `$96.15` |
-| **NexusRec Two-Tower + Hybrid RRF + Cross-Encoder + MMR** | **`0.9142`** | **`0.8750`** | **`0.8500`** | **`1.0000`** | **`73.8%`** | **`0.6845`** | **`$108.60`** |
+| Recommender Architecture | `NDCG@10` | `Recall@10` | `Precision@10` | `MRR` | `IPS` | `SNIPS` (Debiased) | Catalog Coverage | Diversity (`ILD`) | Avg Unit Margin |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Baseline Popularity Ranker** | `0.4165` | `0.3250` | `0.3000` | `0.4583` | `0.3510` | `0.3620` | `23.8%` | `0.5120` | `$98.40` |
+| **Pure Collaborative Filtering (Co-Occurrence)** | `0.7120` | `0.6500` | `0.6250` | `0.7917` | `0.6140` | `0.6480` | `52.4%` | `0.5480` | `$96.15` |
+| **NexusRec Two-Tower + SASRec + Hybrid RRF + CE + MMR** | **`0.9142`** | **`0.8750`** | **`0.8500`** | **`1.0000`** | **`0.8640`** | **`0.8890`** | **`73.8%`** | **`0.6845`** | **`$108.60`** |
 
 - **+119.5% `NDCG@10` lift** over Baseline Popularity and **+28.4% `NDCG@10` lift** over Pure Collaborative Filtering.
 - **79.2% InfoNCE contrastive loss reduction** (`1.984 -> 0.412`, temperature $\tau = 0.08$), achieving a **+0.692 cosine separation margin** between positive `(user, target_item)` pairs and in-batch negatives on the 64-D unit hypersphere.
@@ -69,12 +69,14 @@ flowchart TB
 nexusrec-ai/
 ├── src/
 │   ├── core/
-│   │   ├── catalog.py           # 44-item Retail & Industrial catalog + 32-D OpenCV/NumPy visual & 32-D semantic descriptors
-│   │   ├── two_tower.py         # PyTorch (with automatic NumPy fallback) UserTower + ItemTower + InfoNCE contrastive loss
-│   │   ├── hybrid_retriever.py  # Qdrant-style hard payload filter + Dense Cosine + BM25/SPLADE + RRF (k=60)
-│   │   ├── reranker.py          # GBDT Cross-Encoder + Thompson Sampling Beta(α,β) Bandit + MMR Diversity Filter
-│   │   ├── nlp_assistant.py     # LangGraph-pattern 4-node conversational constraint parser & funnel orchestrator
-│   │   └── evaluator.py         # Deterministic RecSys benchmark suite (NDCG@10, Recall@10, Precision@10, MRR, Coverage, ILD)
+│   │   ├── catalog.py                  # 44-item Retail & Industrial catalog + 32-D OpenCV/NumPy visual & 32-D semantic descriptors
+│   │   ├── two_tower.py                # PyTorch (with automatic NumPy fallback) UserTower + ItemTower + InfoNCE contrastive loss
+│   │   ├── sequential_sasrec.py        # SASRec Causal Self-Attention next-item transition predictor (lower-triangular mask)
+│   │   ├── feature_store_and_export.py # SQLite Point-in-Time Offline Store + Redis NoSQL Session Store + PyTorch/TF/ONNX/TFLite parity
+│   │   ├── hybrid_retriever.py         # Qdrant-style hard payload filter + Dense Cosine + BM25/SPLADE + RRF (k=60)
+│   │   ├── reranker.py                 # GBDT Cross-Encoder + SASRec + Thompson Sampling Beta(α,β) Bandit + MMR Diversity Filter
+│   │   ├── nlp_assistant.py            # LangGraph-pattern 4-node conversational constraint parser & funnel orchestrator
+│   │   └── evaluator.py                # Deterministic RecSys benchmark suite (NDCG@10, Recall@10, MRR, IPS, SNIPS, Coverage, ILD)
 │   ├── api/
 │   │   └── main.py              # FastAPI lifespan app + strict Pydantic v2 models + static frontend mount
 │   └── static/
@@ -125,4 +127,6 @@ All `POST` endpoints enforce `ConfigDict(extra="forbid", str_strip_whitespace=Tr
 | `POST` | `/api/v1/discover` | Executes the 4-stage conversational + visual discovery funnel (`Intent -> Hybrid RRF -> CE/Bandit -> MMR`). |
 | `GET` | `/api/v1/evaluate` | Returns full benchmark evaluation (`NDCG@10`, `Recall@10`, `Precision@10`, `MRR`, `Coverage`, `ILD`). |
 | `POST` | `/api/v1/bandit/feedback` | Updates the Thompson Sampling `Beta(α, β)` posterior for an item arm given conversion/click reward. |
+| `POST` | `/api/v1/session/event` | Simulates a live user click/cart/skip event, updates NoSQL + SQL feature stores & SASRec, and re-ranks Top-K. |
+| `GET` | `/api/v1/feature-store/status` | Returns SQL point-in-time join audit, NoSQL online cache hit rate, and PyTorch/TensorFlow/ONNX/TFLite parity. |
 | `POST` | `/api/v1/two-tower/verify` | Runs an on-demand contrastive InfoNCE training alignment step and returns loss reduction telemetry. |

@@ -25,9 +25,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.core.catalog import MultimodalCatalogStore, extract_query_visual_signature
 from src.core.evaluator import RecSysBenchmarkEvaluator
+from src.core.feature_store_and_export import (
+    CrossFrameworkModelExporter,
+    NoSQLOnlineSessionStore,
+    SQLOfflineFeatureStore,
+)
 from src.core.hybrid_retriever import UniversalHybridRetriever
 from src.core.nlp_assistant import ConversationalCommerceAssistant
 from src.core.reranker import CrossEncoderAndMMRReranker
+from src.core.sequential_sasrec import SASRecSequentialPredictor
 from src.core.two_tower import TwoTowerRecommender
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -116,16 +122,60 @@ class TwoTowerVerifyRequest(BaseModel):
     learning_rate: float = Field(default=0.06, gt=0.001, le=0.5)
 
 
+class SessionEventRequest(BaseModel):
+    """Strict Pydantic v2 request schema for live clickstream trajectory simulation."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    persona_id: str = Field(
+        default="alpine_mountaineer",
+        min_length=2,
+        max_length=64,
+        description="Active buyer persona ID.",
+    )
+    item_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=32,
+        description="Clicked, added-to-cart, or skipped catalog item ID.",
+    )
+    event_type: Literal["click", "add_to_cart", "purchase_conversion", "skip"] = Field(
+        default="click",
+        description="User interaction type updating NoSQL session, SQL log, and SASRec sequence.",
+    )
+    rank_position: int = Field(
+        default=1,
+        ge=1,
+        le=50,
+        description="1-indexed rank position where the user interacted with the SKU.",
+    )
+    query: str = Field(
+        default="waterproof alpine shell under $220 that pairs with crampon boots",
+        min_length=1,
+        max_length=500,
+    )
+    visual_preset: str | None = Field(default=None)
+    top_k: int = Field(default=6, ge=1, le=20)
+    lambda_diversity: float = Field(default=0.72, ge=0.0, le=1.0)
+
+
 def _initialize_engine_state(app: FastAPI) -> None:
-    """Populate `app.state` with singleton ML, Retrieval, Reranking, and Evaluation engines."""
+    """Populate `app.state` with singleton ML, Retrieval, Reranking, Feature Store & Evaluation engines."""
     catalog_store = MultimodalCatalogStore()
     two_tower = TwoTowerRecommender(catalog_store=catalog_store, seed=42)
+    sasrec = SASRecSequentialPredictor(catalog_store=catalog_store, seed=42)
+    sql_offline_store = SQLOfflineFeatureStore(catalog_store=catalog_store)
+    nosql_online_store = NoSQLOnlineSessionStore(catalog_store=catalog_store)
+    model_exporter = CrossFrameworkModelExporter(two_tower=two_tower, sasrec=sasrec)
+
     retriever = UniversalHybridRetriever(catalog_store=catalog_store, two_tower=two_tower)
     reranker = CrossEncoderAndMMRReranker(items=catalog_store.items, seed=42)
     assistant = ConversationalCommerceAssistant(
         catalog_store=catalog_store,
         retriever=retriever,
         reranker=reranker,
+        sasrec=sasrec,
+        online_store=nosql_online_store,
     )
     evaluator = RecSysBenchmarkEvaluator(
         catalog_store=catalog_store,
@@ -134,6 +184,10 @@ def _initialize_engine_state(app: FastAPI) -> None:
 
     app.state.catalog_store = catalog_store
     app.state.two_tower = two_tower
+    app.state.sasrec = sasrec
+    app.state.sql_offline_store = sql_offline_store
+    app.state.nosql_online_store = nosql_online_store
+    app.state.model_exporter = model_exporter
     app.state.retriever = retriever
     app.state.reranker = reranker
     app.state.assistant = assistant
@@ -330,6 +384,128 @@ async def verify_two_tower_training(payload: TwoTowerVerifyRequest) -> dict[str,
         "positive_pair_mean_cosine": metrics.positive_pair_mean_cosine,
         "negative_pair_mean_cosine": metrics.negative_pair_mean_cosine,
         "separation_margin": metrics.separation_margin,
+    }
+
+
+@app.post("/api/v1/session/event")
+async def record_live_session_event(payload: SessionEventRequest) -> dict[str, Any]:
+    """Simulate a live clickstream event, update SQL/NoSQL stores & SASRec, and re-rank shelf."""
+    _ensure_state(app)
+    store: MultimodalCatalogStore = app.state.catalog_store
+    item = store.get_item(payload.item_id)
+    if item is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Catalog item '{payload.item_id}' not found.",
+        )
+
+    nosql_store: NoSQLOnlineSessionStore = app.state.nosql_online_store
+    sql_store: SQLOfflineFeatureStore = app.state.sql_offline_store
+    reranker: CrossEncoderAndMMRReranker = app.state.reranker
+    sasrec: SASRecSequentialPredictor = app.state.sasrec
+    assistant: ConversationalCommerceAssistant = app.state.assistant
+
+    # Capture pre-event SASRec next-item embedding to quantify live user embedding drift
+    prev_session = nosql_store.get_session(payload.persona_id)
+    prev_sasrec = sasrec.predict_next_items(list(prev_session.last_5_clicks))
+
+    reward_map = {
+        "purchase_conversion": 1.0,
+        "add_to_cart": 0.85,
+        "click": 0.65,
+        "skip": 0.0,
+    }
+    reward_val = reward_map.get(payload.event_type, 0.5)
+
+    # 1. Update NoSQL Online Session Store (last_5_clicks, session_price_anchor, real_time_ctr)
+    updated_doc = nosql_store.record_realtime_event(
+        user_id=payload.persona_id,
+        item_id=payload.item_id,
+        event_type=payload.event_type,
+    )
+
+    # 2. Log interaction with position propensity to SQL Offline Store
+    sql_log = sql_store.log_interaction_event(
+        user_id=payload.persona_id,
+        item_id=payload.item_id,
+        event_type=payload.event_type,
+        rank_position=payload.rank_position,
+        reward=reward_val,
+    )
+
+    # 3. Update Thompson Sampling Bandit posterior
+    updated_arm = reranker.bandit.update_arm(item_id=payload.item_id, reward=reward_val)
+
+    # 4. Recompute SASRec sequential attention and measure User Embedding Cosine Drift
+    new_sasrec = sasrec.predict_next_items(list(updated_doc.last_5_clicks))
+    import numpy as np
+
+    v_prev = np.asarray(prev_sasrec.next_item_embedding_64d, dtype=np.float32)
+    v_new = np.asarray(new_sasrec.next_item_embedding_64d, dtype=np.float32)
+    cos_alignment = float(np.dot(v_prev, v_new))
+    embedding_drift = round(max(0.0, 1.0 - cos_alignment), 4)
+
+    # 5. Re-execute the recommendation funnel with the updated live session state
+    updated_funnel = assistant.execute_funnel(
+        query=payload.query,
+        persona_id=payload.persona_id,
+        visual_preset=payload.visual_preset,
+        top_k=payload.top_k,
+        lambda_diversity=payload.lambda_diversity,
+    )
+
+    return {
+        "status": "session_updated",
+        "interacted_item": {
+            "item_id": item.item_id,
+            "sku": item.sku,
+            "title": item.title,
+            "category": item.category,
+            "event_type": payload.event_type,
+            "reward": reward_val,
+        },
+        "embedding_drift_l2_cosine": embedding_drift,
+        "online_session_document": updated_doc.to_dict(),
+        "sql_offline_event_logged": sql_log,
+        "bandit_arm_posterior": {
+            "item_id": updated_arm.item_id,
+            "alpha": updated_arm.alpha,
+            "beta": updated_arm.beta,
+            "posterior_mean": updated_arm.posterior_mean,
+        },
+        "sasrec_sequential_state": new_sasrec.to_dict(),
+        "updated_funnel": updated_funnel,
+    }
+
+
+@app.get("/api/v1/feature-store/status")
+async def get_feature_store_and_export_status() -> dict[str, Any]:
+    """Return SQL point-in-time audit, NoSQL online cache telemetry, and PyTorch/TF/ONNX parity."""
+    _ensure_state(app)
+    sql_store: SQLOfflineFeatureStore = app.state.sql_offline_store
+    nosql_store: NoSQLOnlineSessionStore = app.state.nosql_online_store
+    exporter: CrossFrameworkModelExporter = app.state.model_exporter
+    eval_report: dict[str, Any] = app.state.cached_evaluation
+
+    # Run a live point-in-time join audit at historical cutoff 1700000250.0
+    pit_audit = sql_store.point_in_time_join(
+        user_id="alpine_mountaineer",
+        as_of_timestamp=1700000250.0,
+    )
+    parity_report = exporter.verify_cross_framework_parity()
+
+    return {
+        "sql_offline_store": {
+            **sql_store.get_offline_summary(),
+            "point_in_time_join_audit": pit_audit,
+        },
+        "nosql_online_store": nosql_store.get_online_summary(),
+        "cross_framework_parity": parity_report,
+        "counterfactual_off_policy_summary": {
+            "nexusrec_ips_score": eval_report["headline_lifts"]["nexusrec_ips_score"],
+            "nexusrec_snips_score": eval_report["headline_lifts"]["nexusrec_snips_score"],
+            "snips_lift_multiplier": eval_report["headline_lifts"]["snips_lift_multiplier"],
+        },
     }
 
 

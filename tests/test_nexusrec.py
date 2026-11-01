@@ -35,14 +35,21 @@ from src.core.catalog import (
 )
 from src.core.evaluator import (
     RecSysBenchmarkEvaluator,
+    compute_ips_and_snips,
     compute_mrr,
     compute_ndcg_at_k,
     compute_precision_at_k,
     compute_recall_at_k,
 )
+from src.core.feature_store_and_export import (
+    CrossFrameworkModelExporter,
+    NoSQLOnlineSessionStore,
+    SQLOfflineFeatureStore,
+)
 from src.core.hybrid_retriever import PayloadFilter, UniversalHybridRetriever
 from src.core.nlp_assistant import ConversationalCommerceAssistant
 from src.core.reranker import CrossEncoderAndMMRReranker
+from src.core.sequential_sasrec import SASRecSequentialPredictor
 from src.core.two_tower import EMBEDDING_DIM, TwoTowerRecommender
 
 
@@ -329,3 +336,117 @@ def test_fastapi_endpoints_and_strict_pydantic_validation() -> None:
         )
         assert res_tt.status_code == 200
         assert res_tt.json()["status"] == "verified"
+
+        # 9. Live Clickstream Session Event endpoint (/api/v1/session/event)
+        res_sess = client.post(
+            "/api/v1/session/event",
+            json={
+                "persona_id": "alpine_mountaineer",
+                "item_id": "RET-001",
+                "event_type": "click",
+                "rank_position": 1,
+                "query": "waterproof alpine shell under $220 that pairs with crampon boots",
+                "top_k": 5,
+            },
+        )
+        assert res_sess.status_code == 200
+        s_data = res_sess.json()
+        assert s_data["status"] == "session_updated"
+        assert "RET-001" in s_data["online_session_document"]["last_5_clicks"]
+        assert "embedding_drift_l2_cosine" in s_data
+        assert len(s_data["updated_funnel"]["recommendations"]) == 5
+
+        # 10. Feature Store & Cross-Framework Parity endpoint (/api/v1/feature-store/status)
+        res_fs = client.get("/api/v1/feature-store/status")
+        assert res_fs.status_code == 200
+        fs_data = res_fs.json()
+        assert fs_data["cross_framework_parity"]["parity_verified"] is True
+        assert (
+            fs_data["sql_offline_store"]["point_in_time_join_audit"]["temporal_leakage_audit"]
+            == "PASSED_ZERO_FUTURE_LEAKAGE"
+        )
+
+
+def test_sasrec_causal_self_attention_and_asymmetric_transitions(
+    catalog_store: MultimodalCatalogStore,
+) -> None:
+    """Verify SASRec lower-triangular causal attention masking and asymmetric next-item transitions."""
+    sasrec = SASRecSequentialPredictor(catalog_store=catalog_store, seed=42)
+    seq_ids = ["IND-013", "IND-005", "IND-001"]  # Hydraulic Cylinder -> Valve -> Piston Seal
+    pred = sasrec.predict_next_items(session_item_ids=seq_ids)
+
+    attn_mat = np.asarray(pred.causal_attention_matrix)
+    assert attn_mat.shape == (3, 3)
+    # Upper triangle (j > i) must be strictly 0.0 (no future leakage)
+    assert attn_mat[0, 1] == 0.0
+    assert attn_mat[0, 2] == 0.0
+    assert attn_mat[1, 2] == 0.0
+    # Each row sums to 1.0
+    assert np.allclose(np.sum(attn_mat, axis=-1), 1.0, atol=1e-3)
+
+    # Next-item transition score should penalize already visited items vs. complementary unvisited items
+    assert pred.item_transition_scores["IND-017"] > pred.item_transition_scores["IND-013"]
+
+
+def test_hybrid_sql_nosql_feature_store_and_tf_onnx_parity(
+    catalog_store: MultimodalCatalogStore,
+    two_tower: TwoTowerRecommender,
+) -> None:
+    """Verify SQL point-in-time joins, NoSQL session updates, and PyTorch/TF/ONNX/TFLite parity."""
+    sql_store = SQLOfflineFeatureStore(catalog_store=catalog_store)
+    # Log a future event at t = 1800000000 and verify point-in-time join at t = 1700000250 blocks it
+    sql_store.log_interaction_event(
+        user_id="alpine_mountaineer",
+        item_id="RET-002",
+        event_type="click",
+        rank_position=2,
+        reward=0.8,
+        event_timestamp=1800000000.0,
+    )
+    pit = sql_store.point_in_time_join(
+        user_id="alpine_mountaineer",
+        as_of_timestamp=1700000250.0,
+    )
+    assert pit["temporal_leakage_audit"] == "PASSED_ZERO_FUTURE_LEAKAGE"
+    assert pit["future_events_blocked_from_leakage"] >= 2
+    assert "RET-002" not in pit["point_in_time_item_sequence"]
+
+    # NoSQL online store update verification
+    nosql_store = NoSQLOnlineSessionStore(catalog_store=catalog_store)
+    doc = nosql_store.record_realtime_event(
+        user_id="plant_reliability_lead",
+        item_id="IND-001",
+        event_type="click",
+    )
+    assert doc.last_5_clicks[-1] == "IND-001"
+    assert 0.0 < doc.real_time_ctr <= 1.0
+
+    # Cross-framework PyTorch / ONNX / TensorFlow / TFLite INT8 parity
+    sasrec = SASRecSequentialPredictor(catalog_store=catalog_store, seed=42)
+    exporter = CrossFrameworkModelExporter(two_tower=two_tower, sasrec=sasrec)
+    parity = exporter.verify_cross_framework_parity()
+    assert parity["parity_verified"] is True
+    assert parity["max_abs_diff_pytorch_vs_onnx_fp32"] < 1e-5
+    assert parity["max_abs_diff_pytorch_vs_tensorflow_fp32"] < 1e-5
+    assert parity["tflite_int8_cosine_similarity"] > 0.999
+
+
+def test_counterfactual_ips_and_snips_evaluation(
+    catalog_store: MultimodalCatalogStore,
+    assistant: ConversationalCommerceAssistant,
+) -> None:
+    """Verify Inverse Propensity Scoring (IPS) and Self-Normalized IPS (SNIPS) position de-biasing."""
+    graded = {"ITEM-1": 3, "ITEM-2": 3, "ITEM-3": 0}
+    logging_order = ["ITEM-3", "ITEM-2", "ITEM-1"]
+    target_order = ["ITEM-1", "ITEM-2", "ITEM-3"]
+
+    cf_target = compute_ips_and_snips(target_order, graded, logging_order, k=3)
+    cf_logging = compute_ips_and_snips(logging_order, graded, logging_order, k=3)
+    assert cf_target["snips_score"] > cf_logging["snips_score"]
+    assert cf_target["effective_sample_size"] > 1.0
+
+    evaluator = RecSysBenchmarkEvaluator(catalog_store=catalog_store, assistant=assistant)
+    report = evaluator.evaluate_all_models(k=10)
+    hl = report["headline_lifts"]
+    assert hl["nexusrec_ndcg_at_10"] >= 0.88
+    assert hl["snips_lift_multiplier"] > 1.15

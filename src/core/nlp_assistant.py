@@ -30,8 +30,10 @@ from src.core.catalog import (
     extract_query_visual_signature,
     extract_semantic_descriptor,
 )
+from src.core.feature_store_and_export import NoSQLOnlineSessionStore
 from src.core.hybrid_retriever import PayloadFilter, UniversalHybridRetriever
 from src.core.reranker import CrossEncoderAndMMRReranker, RerankedRecommendation
+from src.core.sequential_sasrec import SASRecSequentialPredictor
 
 
 @dataclass(frozen=True)
@@ -101,10 +103,14 @@ class ConversationalCommerceAssistant:
         catalog_store: MultimodalCatalogStore,
         retriever: UniversalHybridRetriever,
         reranker: CrossEncoderAndMMRReranker,
+        sasrec: SASRecSequentialPredictor | None = None,
+        online_store: NoSQLOnlineSessionStore | None = None,
     ) -> None:
         self.catalog_store = catalog_store
         self.retriever = retriever
         self.reranker = reranker
+        self.sasrec = sasrec or SASRecSequentialPredictor(catalog_store=catalog_store, seed=42)
+        self.online_store = online_store or NoSQLOnlineSessionStore(catalog_store=catalog_store)
 
     def parse_intent(
         self,
@@ -260,36 +266,44 @@ class ConversationalCommerceAssistant:
         )
         embed_ms = round((time.perf_counter() - t_embed_start) * 1000.0, 2)
 
+        # Pull live session clickstream trajectory from NoSQL Online Feature Store
+        session_doc = self.online_store.get_session(base_persona.user_id)
+        live_sequence = list(session_doc.last_5_clicks)
+
         # Augment persona session with compatibility anchors if the user specified "pairs with..."
         active_persona = base_persona
-        if parsed_intent.compatibility_anchor_ids or parsed_intent.detected_domain:
-            merged_recent = list(
-                dict.fromkeys(parsed_intent.compatibility_anchor_ids + base_persona.recent_item_ids)
+        merged_recent = list(
+            dict.fromkeys(
+                parsed_intent.compatibility_anchor_ids
+                + list(reversed(live_sequence))
+                + base_persona.recent_item_ids
             )
-            from src.core.catalog import UserPersona
+        )
+        from src.core.catalog import UserPersona
 
-            active_persona = UserPersona(
-                user_id=base_persona.user_id,
-                name=base_persona.name,
-                role=base_persona.role,
-                preferred_domain=effective_domain,
-                budget_ceiling=parsed_intent.max_price or base_persona.budget_ceiling,
-                price_sensitivity=base_persona.price_sensitivity,
-                margin_affinity=base_persona.margin_affinity,
-                recent_item_ids=merged_recent,
-                intent_keywords=list(
-                    dict.fromkeys(parsed_intent.extracted_tags + base_persona.intent_keywords)
-                ),
-                description=base_persona.description,
-            )
+        active_persona = UserPersona(
+            user_id=base_persona.user_id,
+            name=base_persona.name,
+            role=base_persona.role,
+            preferred_domain=effective_domain,
+            budget_ceiling=parsed_intent.max_price or base_persona.budget_ceiling,
+            price_sensitivity=base_persona.price_sensitivity,
+            margin_affinity=base_persona.margin_affinity,
+            recent_item_ids=merged_recent[:6],
+            intent_keywords=list(
+                dict.fromkeys(parsed_intent.extracted_tags + base_persona.intent_keywords)
+            ),
+            description=base_persona.description,
+        )
+
+        # Compute SASRec Causal Self-Attention Next-Item Transition Scores
+        sasrec_out = self.sasrec.predict_next_items(session_item_ids=live_sequence)
 
         # Stage 1 & 2 / Node 3: Hybrid Retrieval (Payload Filter + Two-Tower Dense + BM25 + RRF)
         t_ret_start = time.perf_counter()
-        # Use domain + max_price + in_stock as hard Qdrant filters; keep category broader so MMR
-        # can surface complementary cross-category kit items while boosting primary category
         payload_filter = PayloadFilter(
             domain=parsed_intent.detected_domain,
-            category=explicit_category,  # Only hard-lock category when explicitly filtered via UI dropdown
+            category=explicit_category,
             max_price=parsed_intent.max_price,
             min_price=parsed_intent.min_price,
             in_stock_only=in_stock_only,
@@ -304,7 +318,7 @@ class ConversationalCommerceAssistant:
         )
         retrieve_ms = round((time.perf_counter() - t_ret_start) * 1000.0, 2)
 
-        # Stage 3 & 4 / Node 4: Cross-Encoder + Thompson Bandit + MMR Diversity Reranker
+        # Stage 3 & 4 / Node 4: Cross-Encoder + SASRec + Thompson Bandit + MMR Diversity Reranker
         t_rerank_start = time.perf_counter()
         rerank_out = self.reranker.rerank_with_mmr(
             candidates=retrieval_out["candidates"],
@@ -313,6 +327,7 @@ class ConversationalCommerceAssistant:
             lambda_diversity=lambda_diversity,
             bandit_exploration_weight=bandit_exploration_weight,
             price_ceiling=parsed_intent.max_price,
+            sasrec_transition_scores=sasrec_out.item_transition_scores,
         )
         rerank_ms = round((time.perf_counter() - t_rerank_start) * 1000.0, 2)
         total_ms = round((time.perf_counter() - t0) * 1000.0, 2)
@@ -333,6 +348,8 @@ class ConversationalCommerceAssistant:
                 "budget_ceiling": active_persona.budget_ceiling,
                 "recent_item_ids": active_persona.recent_item_ids,
             },
+            "online_session_state": session_doc.to_dict(),
+            "sasrec_sequential_prediction": sasrec_out.to_dict(),
             "parsed_intent": parsed_intent.to_dict(),
             "visual_query_signature": visual_sig,
             "funnel_telemetry": {
